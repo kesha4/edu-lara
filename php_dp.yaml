@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: php
+  labels:
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: php
+      tier: backend
+  template:
+    metadata:
+      labels:
+        app: php
+        tier: backend
+    spec:
+      enableServiceLinks: false
+      initContainers:
+        - name: database-migrations
+          image: kesha4/edu_laravel:v26
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: php-cm
+            - secretRef:
+                name: php-secret
+          command:
+            - "/bin/sh"
+            - "-c"
+            - "php artisan migrate --force && php artisan db:seed"
+      containers:
+        - name: php
+          image: kesha4/edu_laravel:v26
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: code
+              mountPath: /code
+          lifecycle:
+            postStart:
+              exec:
+                command: [ "/bin/sh", "-c", "cp -r /var/www/html/. /code" ]
+          envFrom:
+            - configMapRef:
+                name: php-cm
+            - secretRef:
+                name: php-secret
+      volumes:
+        - name: code
+          persistentVolumeClaim:
+            claimName: code-pvc
